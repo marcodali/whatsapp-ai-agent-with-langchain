@@ -9,43 +9,53 @@ load_dotenv()
 class AmorisChatbot:
     def __init__(self, index_name="vector_store_idx:social_profiles"):
         # Inicializar componentes base
-        self.redis_search = RedisVectorSearch()
-        self.llm = ChatOpenAI(temperature=0.7, model_name="gpt-3.5-turbo")
+        self.vector_search = RedisVectorSearch(index_name)
+        self.llm = ChatOpenAI(temperature=0.4, model_name="gpt-4o-mini")
         
-        # Definir el prompt para procesar consultas de usuario
+        # Prompt para entender la intención del usuario
         self.query_prompt = PromptTemplate(
-            input_variables=["consulta_usuario"],
-            template="""Eres un asistente experto en búsqueda de perfiles sociales.
-            Analiza la siguiente consulta y genera una versión mejorada que ayude a encontrar los perfiles más relevantes.
-            
-            Consulta original: {consulta_usuario}
-            
-            Reglas:
-            1. Mantén las palabras clave importantes (profesión, país, red social)
-            2. Expande sinónimos relevantes
-            3. Añade contexto si es necesario
-            4. Mantén el lenguaje natural
-            
-            Responde SOLO con la consulta mejorada, sin explicaciones adicionales."""
+            input_variables=["consulta_usuario", "nombre_usuario", "nacionalidad_usuario", "VIP_or_not", "boolean_permiso"],
+            template="""Eres Cupido, un experto en conectar corazones a través de profesiones y culturas. 
+            Tu misión es entender profundamente lo que busca esta persona y encontrar conexiones significativas.
+
+            Consulta del usuario: {consulta_usuario}
+
+            Instrucciones:
+            1. Identifica la profesión y nacionalidad mencionadas o implícitas
+            2. Considera variaciones culturales y términos profesionales similares
+               (Ej: "doctor/médico", "USA/Estados Unidos")
+            3. Mantén la esencia humana en la búsqueda
+            4. Solo los perfiles VIP pueden buscar perfiles de otro país diferente al suyo,
+                para este caso en particular nuestro usuario {nombre_usuario} es de tipo {VIP_or_not}
+                por lo que {boolean_permiso} tiene el permiso. Su nacionalidad es {nacionalidad_usuario}.
+
+            Reformula la consulta para encontrar personas afines, manteniendo un balance entre precisión y apertura.
+            Responde solo con la consulta mejorada, sin explicaciones."""
         )
         
-        # Definir el prompt para formatear resultados
+        # Prompt para presentar matches potenciales
         self.response_prompt = PromptTemplate(
-            input_variables=["consulta_usuario", "resultados"],
-            template="""Actúa como un asistente amigable y profesional que ayuda a conectar personas.
+            input_variables=["consulta_usuario", "resultados", "nombre_usuario", "nacionalidad_usuario"],
+            template="""Eres un consejero romántico carismático y empático que cree en el poder de las conexiones auténticas.
             
-            Consulta del usuario: {consulta_usuario}
+            Buscando para: {nombre_usuario}
+            Su interés: {consulta_usuario}
+            País de Orígen: {nacionalidad_usuario}
             
-            Resultados encontrados:
+            Perfiles encontrados:
             {resultados}
             
-            Por favor, presenta los resultados de manera conversacional y amigable:
-            1. Saluda al usuario
-            2. Resume brevemente lo que encontraste
-            3. Presenta cada perfil de manera atractiva
-            4. Sugiere cómo podrían refinar su búsqueda si los resultados no son ideales
+            Instrucciones para presentar los matches:
+            1. Saluda calurosamente y muestra entusiasmo por las posibilidades
+            2. Presenta cada perfil como una historia única, destacando:
+               - Lo interesante de su profesión y posibles puntos en común
+               - Las redes sociales como ventana a su mundo
+            3. Si hay matches profesionales, menciona el potencial de entendimiento mutuo
+            4. Si hay matches culturales, resalta la belleza de compartir o descubrir una cultura
+            5. Si los resultados no son ideales, ofrece sugerencias constructivas para ampliar la búsqueda
             
-            Mantén un tono profesional pero cercano."""
+            Mantén un tono optimista, respetuoso y genuino. Evita clichés y superficialidades.
+            Recuerda: estamos conectando personas reales con sueños y aspiraciones."""
         )
         
         # Crear las cadenas de procesamiento
@@ -59,7 +69,7 @@ class AmorisChatbot:
             self.llm
         )
     
-    def process_query(self, user_input: str, num_results: int = 3) -> str:
+    def process_query(self, user_input: str, num_results: int = 2) -> str:
         """
         Procesa la consulta del usuario y retorna una respuesta formatada.
         
@@ -71,17 +81,26 @@ class AmorisChatbot:
             str: Respuesta formatada para el usuario
         """
         # Paso 1: Mejorar la consulta con el LLM
+        VIP_or_not = "VIP"
         enhanced_query = self.query_chain.invoke({
-            "consulta_usuario": user_input
+            "consulta_usuario": user_input,
+            "nombre_usuario": "Kike",
+            "nacionalidad_usuario": "Colombia",
+            "VIP_or_not": VIP_or_not,   # Básico
+            "boolean_permiso": "SI" if VIP_or_not == "VIP" else "NO",
         }).content
+
+        print(f"Consulta mejorada: {enhanced_query}")
         
         # Paso 2: Realizar la búsqueda vectorial
-        results = self.redis_search.search_similar_profiles(enhanced_query, k=num_results)
+        similar_profiles = self.vector_search.search_similar_profiles(enhanced_query, k=num_results)
         
         # Paso 3: Formatear los resultados para una respuesta amigable
         formatted_response = self.response_chain.invoke({
+            "nombre_usuario": "Kike",
+            "nacionalidad_usuario": "Colombia",
             "consulta_usuario": user_input,
-            "resultados": str(results)  # Convertimos a string para el prompt
+            "resultados": str(similar_profiles)
         })
         
         return formatted_response.content
@@ -90,24 +109,13 @@ class AmorisChatbot:
         """
         Inicia una sesión de chat interactiva con el usuario.
         """
-        print("¡Hola! Soy tu asistente de Amoris Laboris. ¿En qué puedo ayudarte hoy?")
-        print("(Escribe 'salir' para terminar)")
-        
         while True:
-            user_input = input("\nTú: ").strip()
-            
-            if user_input.lower() == 'salir':
-                print("\nAsistente: ¡Hasta luego! Fue un placer ayudarte.")
-                break
-            
+            user_input = input("\nTe ayudo a buscar pareja, dime como la quieres: ").strip()
             try:
-                response = self.process_query(user_input)
-                print("\nAsistente:", response)
+                print("\n", self.process_query(user_input)) # respuesta del chatbot
             except Exception as e:
-                print(f"\nAsistente: Lo siento, ocurrió un error: {str(e)}")
-                print("Por favor, intenta reformular tu consulta.")
+                print(f"\nLo siento, ocurrió un error: {str(e)}")
 
-# Ejemplo de uso
 if __name__ == "__main__":
     chatbot = AmorisChatbot()
     chatbot.chat()

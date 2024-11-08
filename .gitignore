@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Database
+export_redis.json
+
 # C extensions
 *.so
 
