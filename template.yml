@@ -1,0 +1,28 @@
+# template.yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Amoris Dating Chatbot Lambda Function
+
+Resources:
+  AmorisChatbotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          OPENAI_API_KEY: '{{resolve:ssm:/amoris/openai_api_key:1}}'
+          REDIS_HOST: '{{resolve:ssm:/amoris/redis_host:1}}'
+          REDIS_PORT: '{{resolve:ssm:/amoris/redis_port:1}}'
+          REDIS_PASSWORD: '{{resolve:ssm:/amoris/redis_password:1}}'
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        WhatsAppWebhook:
+          Type: Api
+          Properties:
+            Path: /webhook
+            Method: post
