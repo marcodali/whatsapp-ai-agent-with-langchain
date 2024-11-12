@@ -8,3 +8,12 @@ This repo shows you how to use a redis database as the source of a fully operati
 * Redis instead of the traditional boring SQL world (Postgres, Maria)
 * Python instead of NodeJS
 * AWS instead of Jupiter Notebook for deployment and testing
+
+## Deploy to AWS Lambda
+```bash
+bash build_lambda.sh
+bash build_layers.sh
+terraform init
+terraform plan
+terraform apply
+```
