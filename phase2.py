@@ -2,9 +2,6 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.schema.runnable import RunnableSequence
 from laTerceraEsLaVencida import RedisVectorSearch
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class AmorisChatbot:
     def __init__(self, index_name="vector_store_idx:social_profiles"):

@@ -2,13 +2,15 @@ from langchain_community.vectorstores.redis import Redis
 from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document
 from redis import Redis as RedisClient
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
 
 class RedisVectorSearch:
     def __init__(self, index_name="vector_store_idx:social_profiles"):
+        # Si estamos en desarrollo, carga .env
+        if os.getenv('ENV') != 'production':
+            from dotenv import load_dotenv
+            load_dotenv()
+        
         self.redis_client = RedisClient(
             host=os.getenv('REDIS_HOST'),
             port=int(os.getenv('REDIS_PORT')),
