@@ -1,5 +1,4 @@
 #!/bin/bash
-source venv/bin/activate
 
 # 1. Capa para langchain-community
 mkdir -p langchain/python
