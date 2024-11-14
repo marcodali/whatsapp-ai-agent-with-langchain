@@ -89,6 +89,16 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
   retention_in_days = 14
 }
 
+# Crear una URL directa para la función Lambda
+resource "aws_lambda_function_url" "amoris_chatbot_url" {
+  function_name      = aws_lambda_function.amoris_chatbot.function_name
+  authorization_type = "NONE"
+
+  cors {
+    allow_origins = ["*"]
+  }
+}
+
 # Función Lambda principal
 resource "aws_lambda_function" "amoris_chatbot" {
   filename         = "package.zip"
@@ -143,6 +153,11 @@ variable "openai_api_key" {
 output "lambda_function_arn" {
   description = "ARN de la función Lambda"
   value       = aws_lambda_function.amoris_chatbot.arn
+}
+
+output "lambda_function_url" {
+  description = "URL de la función Lambda"
+  value       = aws_lambda_function_url.amoris_chatbot_url.function_url
 }
 
 output "layer_arns" {

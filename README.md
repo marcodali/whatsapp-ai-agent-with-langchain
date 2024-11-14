@@ -32,3 +32,20 @@ terraform init
 terraform plan
 terraform apply
 ```
+
+## Test
+Send a **POST** request to `https://lk3ytpq2m2g7cyyo3x7jkrt5n40bqdwv.lambda-url.ca-central-1.on.aws/` with a json body:
+
+```json
+{
+  "query": "quiero una chica que hable ingles y que sea un reto para mi a nivel intelectual pero al mismo tiempo me sea cariñosa y comprensiva"
+}
+```
+
+The response will be something like:
+```json
+{
+	"message": "...es una psicóloga apasionada que... ...Su carrera implica un alto nivel de análisis y pensamiento crítico, lo que puede ofrecerte el reto intelectual que buscas...",
+	"status": "success"
+}
+```
