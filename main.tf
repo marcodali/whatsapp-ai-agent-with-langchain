@@ -11,7 +11,7 @@ provider "aws" {
   region = "ca-central-1"
 }
 
-# Crear bucket S3 para almacenar los paquetes de Lambda y capas
+# S3 Bucket para lambdas y capas
 resource "aws_s3_bucket" "lambda_bucket" {
   bucket = "amoris-laboris-chatbot"
 }
@@ -38,7 +38,47 @@ resource "aws_s3_object" "layer3" {
   acl    = "private"
 }
 
-# Crear las capas de Lambda a partir de los archivos en S3
+# Subir archivo de Lambda Go
+resource "aws_s3_object" "go_lambda" {
+  bucket = aws_s3_bucket.lambda_bucket.bucket
+  key    = "functions/receiver.zip"
+  source = "receiver.zip"
+  acl    = "private"
+}
+
+# Crear SQS Queue
+resource "aws_sqs_queue" "chatbot_queue" {
+  name                      = "amoris-chatbot-queue"
+  message_retention_seconds = 1209600 # 14 días
+  visibility_timeout_seconds = 60
+}
+
+# EventBridge Rule
+resource "aws_cloudwatch_event_rule" "sqs_events" {
+  name        = "capture-sqs-messages"
+  description = "Capture messages added to SQS queue"
+
+  event_pattern = jsonencode({
+    source      = ["aws.sqs"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventSource = ["sqs.amazonaws.com"]
+      eventName   = ["SendMessage"]
+      requestParameters = {
+        queueUrl = [aws_sqs_queue.chatbot_queue.id]
+      }
+    }
+  })
+}
+
+# EventBridge Target
+resource "aws_cloudwatch_event_target" "sqs_to_lambda" {
+  rule      = aws_cloudwatch_event_rule.sqs_events.name
+  target_id = "ProcessSQSMessage"
+  arn       = aws_lambda_function.amoris_chatbot.arn
+}
+
+# Capas Lambda
 resource "aws_lambda_layer_version" "layer_langchain" {
   layer_name          = "amoris_chatbot_langchain"
   compatible_runtimes = ["python3.11"]
@@ -60,7 +100,50 @@ resource "aws_lambda_layer_version" "layer_redis" {
   s3_key              = aws_s3_object.layer3.key
 }
 
-# Crear rol de IAM para la función Lambda
+# Rol IAM para Lambda Go
+resource "aws_iam_role" "go_lambda_role" {
+  name = "amoris_chatbot_go_lambda_role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      },
+    ]
+  })
+}
+
+# Política para que Lambda Go pueda escribir en SQS
+resource "aws_iam_role_policy" "go_lambda_sqs" {
+  name = "sqs_access"
+  role = aws_iam_role.go_lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:GetQueueUrl"
+        ]
+        Resource = [aws_sqs_queue.chatbot_queue.arn]
+      }
+    ]
+  })
+}
+
+# Política de logs para Lambda Go
+resource "aws_iam_role_policy_attachment" "go_lambda_logs" {
+  role       = aws_iam_role.go_lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Rol IAM para Lambda Python
 resource "aws_iam_role" "lambda_role" {
   name = "amoris_chatbot_lambda_role"
   assume_role_policy = jsonencode({
@@ -77,21 +160,47 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# Asignar política para logs de CloudWatch al rol de IAM
+# Política para que Lambda Python pueda leer de SQS
+resource "aws_iam_role_policy" "python_lambda_sqs" {
+  name = "sqs_access"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = [aws_sqs_queue.chatbot_queue.arn]
+      }
+    ]
+  })
+}
+
+# Política de logs para Lambda Python
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# Grupo de logs en CloudWatch
+# Grupos de logs en CloudWatch
 resource "aws_cloudwatch_log_group" "lambda_logs" {
   name              = "/aws/lambda/amoris-chatbot"
   retention_in_days = 14
 }
 
-# Crear una URL directa para la función Lambda
-resource "aws_lambda_function_url" "amoris_chatbot_url" {
-  function_name      = aws_lambda_function.amoris_chatbot.function_name
+resource "aws_cloudwatch_log_group" "go_lambda_logs" {
+  name              = "/aws/lambda/amoris-chatbot-receiver"
+  retention_in_days = 14
+}
+
+# URL para la Lambda Go
+resource "aws_lambda_function_url" "receiver_url" {
+  function_name      = aws_lambda_function.receiver.function_name
   authorization_type = "NONE"
 
   cors {
@@ -99,16 +208,34 @@ resource "aws_lambda_function_url" "amoris_chatbot_url" {
   }
 }
 
-# Función Lambda principal
+# Lambda Go para recibir requests
+resource "aws_lambda_function" "receiver" {
+  filename         = "receiver.zip"
+  function_name    = "amoris-chatbot-receiver"
+  role            = aws_iam_role.go_lambda_role.arn
+  handler         = "receiver"
+  runtime         = "provided.al2"
+  architectures   = ["arm64"]
+  timeout         = 10
+  memory_size     = 128
+
+  environment {
+    variables = {
+      QUEUE_URL = aws_sqs_queue.chatbot_queue.url
+    }
+  }
+}
+
+# Lambda Python principal
 resource "aws_lambda_function" "amoris_chatbot" {
   filename         = "package.zip"
   function_name    = "amoris-chatbot"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "lambda.handler"
-  runtime          = "python3.11"
-  timeout          = 30
-  memory_size      = 256
-  layers           = [
+  role            = aws_iam_role.lambda_role.arn
+  handler         = "lambda.handler"
+  runtime         = "python3.11"
+  timeout         = 30
+  memory_size     = 256
+  layers          = [
     aws_lambda_layer_version.layer_langchain.arn,
     aws_lambda_layer_version.layer_openai.arn,
     aws_lambda_layer_version.layer_redis.arn,
@@ -120,11 +247,12 @@ resource "aws_lambda_function" "amoris_chatbot" {
       REDIS_PORT     = var.redis_port
       REDIS_PASSWORD = var.redis_password
       OPENAI_API_KEY = var.openai_api_key
+      QUEUE_URL      = aws_sqs_queue.chatbot_queue.url
     }
   }
 }
 
-# Variables sensibles
+# Variables
 variable "redis_host" {
   description = "Redis host address"
   type        = string
@@ -149,26 +277,25 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
-# Salidas
-output "lambda_function_arn" {
-  description = "ARN de la función Lambda"
+# Outputs
+output "receiver_lambda_url" {
+  description = "URL de la función Lambda Go"
+  value       = aws_lambda_function_url.receiver_url.function_url
+}
+
+output "python_lambda_arn" {
+  description = "ARN de la función Lambda Python"
   value       = aws_lambda_function.amoris_chatbot.arn
 }
 
-output "lambda_function_url" {
-  description = "URL de la función Lambda"
-  value       = aws_lambda_function_url.amoris_chatbot_url.function_url
+output "sqs_queue_url" {
+  description = "URL de la cola SQS"
+  value       = aws_sqs_queue.chatbot_queue.url
 }
 
-output "layer_arns" {
-  description = "ARNs de las capas de Lambda"
-  value       = [
-    aws_lambda_layer_version.layer_langchain.arn,
-    aws_lambda_layer_version.layer_openai.arn,
-    aws_lambda_layer_version.layer_redis.arn,
-  ]
-}
-
-output "cloudwatch_log_group" {
-  value = aws_cloudwatch_log_group.lambda_logs.name
+output "cloudwatch_log_groups" {
+  value = {
+    python = aws_cloudwatch_log_group.lambda_logs.name
+    go     = aws_cloudwatch_log_group.go_lambda_logs.name
+  }
 }

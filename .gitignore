@@ -49,3 +49,7 @@ venv.bak/
 .vscode/
 *.swp
 *.swo
+
+# Golang
+bootstrap
+
