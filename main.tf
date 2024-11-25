@@ -227,6 +227,7 @@ resource "aws_lambda_function" "amoris_chatbot" {
     variables = {
       REDIS_HOST     = var.redis_host
       REDIS_PORT     = var.redis_port
+      WHATSAPP_INSTANCE_ID = var.whatsapp_instance_id
       REDIS_PASSWORD = var.redis_password
       OPENAI_API_KEY = var.openai_api_key
       QUEUE_URL      = aws_sqs_queue.chatbot_queue.url
@@ -243,6 +244,12 @@ variable "redis_host" {
 
 variable "redis_port" {
   description = "Redis port"
+  type        = string
+  sensitive   = true
+}
+
+variable "whatsapp_instance_id" {
+  description = "WhatsApp instance ID"
   type        = string
   sensitive   = true
 }
