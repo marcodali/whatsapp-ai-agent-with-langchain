@@ -65,6 +65,7 @@ class AmorisChatbot:
         enhanced_query = (
             f"Persona de {nacionalidad_usuario} idealmente. {user_input}"
         )
+        print(f"Enriqueciendo la búsqueda con: {enhanced_query}")
 
         # Realizar la búsqueda vectorial con la query enriquecida
         similar_profiles = self.vector_search.search_similar_profiles(

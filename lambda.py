@@ -7,19 +7,14 @@ from phase2 import AmorisChatbot
 def send_message_to_whatsapp(destinatario: str, mensaje: str):
     import requests
 
-    url = f"https://api.green-api.com/waInstance{os.getenv("WHATSAPP_INSTANCE_ID")}/sendMessage/{os.getenv("API_TOKEN_INSTANCE")}"
+    url = f"https://api.green-api.com/waInstance{os.getenv('WHATSAPP_INSTANCE_ID')}/sendMessage/{os.getenv('API_TOKEN_INSTANCE')}"
 
-    payload = {
-        "chatId": destinatario,
-        "message": mensaje
-    }
-    headers = {
-        'Content-Type': 'application/json'
-    }
+    payload = {"chatId": destinatario, "message": mensaje}
+    headers = {"Content-Type": "application/json"}
 
     response = requests.post(url, json=payload, headers=headers)
 
-    print(response.text.encode('utf8'))
+    print(response.text.encode("utf8"))
 
 
 def get_country_from_code(sender_phone_number: str) -> str:
@@ -146,7 +141,9 @@ def handler(event: dict, context) -> dict:
     """
     try:
         # Print the incoming event
-        print(f"Received event from green-api: {json.loads(event["Records"][0]["body"])}")
+        print(
+            f"Received event from green-api: {json.loads(event['Records'][0]['body'])}"
+        )
 
         # Validate the event
         validation_result = validate_event(event)
@@ -160,11 +157,12 @@ def handler(event: dict, context) -> dict:
 
         # Initialize the chatbot and process the query
         chatbot = AmorisChatbot()
-        print(f"Processing query: {query}")
         response = chatbot.process_query(
             query, nombre_usuario, nacionalidad_usuario
         )
-        print(f"A mi amigo {nombre_usuario} con número de telefono {destinatario} le voy a responder: {response}")
+        print(
+            f"A mi amigo {nombre_usuario} con número de telefono {destinatario} le voy a responder: {response}"
+        )
 
         send_message_to_whatsapp(destinatario, response)
 
