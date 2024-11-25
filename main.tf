@@ -227,6 +227,7 @@ resource "aws_lambda_function" "amoris_chatbot" {
     variables = {
       REDIS_HOST     = var.redis_host
       REDIS_PORT     = var.redis_port
+      API_TOKEN_INSTANCE   = var.api_token_instance
       WHATSAPP_INSTANCE_ID = var.whatsapp_instance_id
       REDIS_PASSWORD = var.redis_password
       OPENAI_API_KEY = var.openai_api_key
@@ -244,6 +245,12 @@ variable "redis_host" {
 
 variable "redis_port" {
   description = "Redis port"
+  type        = string
+  sensitive   = true
+}
+
+variable "api_token_instance" {
+  description = "GREEN API token instance"
   type        = string
   sensitive   = true
 }
