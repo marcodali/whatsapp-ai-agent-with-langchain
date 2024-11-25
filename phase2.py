@@ -7,9 +7,9 @@ from laTerceraEsLaVencida import RedisVectorSearch
 class AmorisChatbot:
     def __init__(self, index_name="vector_store_idx:social_profiles"):
         self.vector_search = RedisVectorSearch(index_name)
-        self.llm = ChatOpenAI(temperature=0.2, model_name="gpt-4o-mini")
+        self.llm = ChatOpenAI(temperature=0.3, model_name="gpt-4o-mini")
 
-        # Prompt para presentar matches potenciales con un enfoque más natural y directo
+        # Prompt para presentar matches potenciales con un balance entre profesionalismo y calidez
         self.response_prompt = PromptTemplate(
             input_variables=[
                 "consulta_usuario",
@@ -17,7 +17,7 @@ class AmorisChatbot:
                 "nombre_usuario",
                 "nacionalidad_usuario",
             ],
-            template="""Actúa como un asistente amigable pero profesional que ayuda a las personas a encontrar su media naranja.
+            template="""Eres un asistente empático y profesional que ayuda a las personas a encontrar conexiones genuinas.
             
             Usuario: {nombre_usuario}
             País: {nacionalidad_usuario}
@@ -27,15 +27,16 @@ class AmorisChatbot:
             {resultados}
             
             Instrucciones para presentar los perfiles:
-            1. Usa un tono amigable pero profesional, evitando exageraciones o entusiasmo artificial
-            2. Presenta cada perfil destacando:
-               - Su ocupación y actividades principales
-               - Las redes sociales disponibles para contacto
-            3. Mantén las descripciones concisas y relevantes
-            4. Evita hacer suposiciones sobre compatibilidad o dar consejos no solicitados
-            5. No incluyas reflexiones finales ni sugerencias adicionales
+            1. Saluda brevemente y de manera personal, usando el nombre del usuario
+            2. Presenta cada perfil destacando con calidez:
+               - Su nombre y ocupación
+               - Aspectos interesantes de su perfil que coincidan con la búsqueda
+               - Las redes sociales donde pueden conocerse mejor
+            3. Si hay coincidencia de país, menciónalo como un punto positivo
+            4. Mantén un tono genuino pero moderado
+            5. Sé conciso pero cálido en las descripciones
             
-            Enfócate en presentar la información de manera clara y directa, permitiendo que el usuario tome sus propias decisiones.""",
+            Recuerda: el objetivo es presentar cada perfil de manera auténtica, permitiendo que las conexiones surjan naturalmente.""",
         )
 
         # Crear la cadena de procesamiento para la respuesta
@@ -60,12 +61,17 @@ class AmorisChatbot:
         Returns:
             str: Respuesta formatada para el usuario
         """
-        # Realizar la búsqueda vectorial directamente con la consulta original
-        similar_profiles = self.vector_search.search_similar_profiles(
-            user_input, k=num_results
+        # Enriquecer la búsqueda para priorizar matches del mismo país sin ser restrictivo
+        enhanced_query = (
+            f"Persona de {nacionalidad_usuario} idealmente. {user_input}"
         )
 
-        # Formatear los resultados con nuestro LLM para una respuesta amigable
+        # Realizar la búsqueda vectorial con la query enriquecida
+        similar_profiles = self.vector_search.search_similar_profiles(
+            enhanced_query, k=num_results
+        )
+
+        # Formatear los resultados con nuestro LLM para una respuesta balanceada
         formatted_response = self.response_chain.invoke(
             {
                 "nombre_usuario": nombre_usuario,
@@ -85,7 +91,9 @@ class AmorisChatbot:
         nombre_usuario = input("\nPor favor, ingresa tu nombre: ").strip()
         nacionalidad_usuario = input("¿De qué país eres?: ").strip()
 
-        print(f"\nBienvenido/a {nombre_usuario}! ¿En qué puedo ayudarte hoy?")
+        print(
+            f"\nHola {nombre_usuario}, me alegra ayudarte a encontrar una conexión especial."
+        )
 
         while True:
             user_input = input(
