@@ -55,7 +55,7 @@ def handler(event: dict, context) -> dict:
 
         # Process the query
         print(f"Processing query: {query}")
-        response = chatbot.process_query(query)
+        response = chatbot.process_query(query, nombre_usuario="Erick", nacionalidad_usuario="Mexico", num_results=2)
         print(f"Generated response: {response}")
 
         return create_response(200, {"message": response, "status": "success"})
