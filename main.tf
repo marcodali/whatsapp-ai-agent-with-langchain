@@ -53,29 +53,11 @@ resource "aws_sqs_queue" "chatbot_queue" {
   visibility_timeout_seconds = 60
 }
 
-# EventBridge Rule
-resource "aws_cloudwatch_event_rule" "sqs_events" {
-  name        = "capture-sqs-messages"
-  description = "Capture messages added to SQS queue"
-
-  event_pattern = jsonencode({
-    source      = ["aws.sqs"]
-    detail-type = ["AWS API Call via CloudTrail"]
-    detail = {
-      eventSource = ["sqs.amazonaws.com"]
-      eventName   = ["SendMessage"]
-      requestParameters = {
-        queueUrl = [aws_sqs_queue.chatbot_queue.id]
-      }
-    }
-  })
-}
-
-# EventBridge Target
-resource "aws_cloudwatch_event_target" "sqs_to_lambda" {
-  rule      = aws_cloudwatch_event_rule.sqs_events.name
-  target_id = "ProcessSQSMessage"
-  arn       = aws_lambda_function.amoris_chatbot.arn
+# Configurar SQS como fuente de eventos para Lambda Python
+resource "aws_lambda_event_source_mapping" "sqs_lambda" {
+  event_source_arn = aws_sqs_queue.chatbot_queue.arn
+  function_name    = aws_lambda_function.amoris_chatbot.arn
+  batch_size       = 1
 }
 
 # Capas Lambda

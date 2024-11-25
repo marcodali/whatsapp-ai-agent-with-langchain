@@ -18,7 +18,7 @@ To deploy the project on an `x86_64` AWS Lambda environment, you need to create 
 Follow these steps:
 
 1. Navigate to the `layers/` folder.
-2. Build and run the Docker container using the provided Dockerfile.
+2. Build and run the Docker container using the provided Dockerfile. `docker build -t lambda-builder .`
 3. Inside the running container, execute the commands listed in the `build_layers.sh` file.
 4. Copy the generated `.zip` files from the container to the project's root directory.
 
@@ -27,14 +27,14 @@ Follow these steps:
 To deploy the application to AWS Lambda using Terraform, follow these steps:
 
 ```bash
-bash build_lambda.sh
+bash build_lambdas.sh
 terraform init
 terraform plan
 terraform apply
 ```
 
 ## Test
-Send a **POST** request to `https://lk3ytpq2m2g7cyyo3x7jkrt5n40bqdwv.lambda-url.ca-central-1.on.aws/` with a json body:
+Send a **POST** request to `Go Endpoint` with a json body:
 
 ```json
 {
@@ -42,10 +42,7 @@ Send a **POST** request to `https://lk3ytpq2m2g7cyyo3x7jkrt5n40bqdwv.lambda-url.
 }
 ```
 
-The response will be something like:
-```json
-{
-	"message": "...es una psicóloga apasionada que... ...Su carrera implica un alto nivel de análisis y pensamiento crítico, lo que puede ofrecerte el reto intelectual que buscas...",
-	"status": "success"
-}
+The response (on Whatsapp) will be something like:
+```python
+"...es una psicóloga apasionada que... ...Su carrera implica un alto nivel de análisis y pensamiento crítico, lo que puede ofrecerte el reto intelectual que buscas..."
 ```
